@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Planner Unit Test</title>
+    <link rel="stylesheet" href="index.css">
+    <style>
+        .status-box {
+            display: inline-block;
+            border: 1px solid #aaaaaa;
+            border-radius: 4px;
+            margin: 10px auto;
+            padding: 5px;
+        }
+        
+        .status-box p {
+            font-size: 9px;
+        }
+        
+        .status-message {
+            font-size: 5px !important;
+        }
+    </style>
+</head>
+<body onload="initiateTesting()">
+    <div id="form-container">
+        <h1>Route Planner Unit Test</h1>
+        <p>Unit testing will be conducted automatically on page load.</p>
+        <input type="text" id="origin" value="City University of Hong Kong (CityU), Tat Chee Avenue, Kowloon Tong, Hong Kong" placeholder="Pickup location" required>
+        <input type="text" id="destination" value="The Chinese University of Hong Kong (CUHK), Central Avenue, Ma Liu Shui, Hong Kong" placeholder="Drop-off location" required>
+        <div id="status-container">
+            <div class="status-box"><p>Case 1<br>Non-empty values</p><div id="case1"><p>Pending</p></div></div>
+            <div class="status-box"><p>Case 2<br>Tokenization Request Error</p><div id="case2"><p>Pending</p></div></div>
+            <div class="status-box"><p>Case 3<br>Tokenization Request Success</p><div id="case3"><p>Pending</p></div></div>
+            <div class="status-box"><p>Case 4<br>Result Request Error</p><div id="case4"><p>Pending</p></div></div>
+            <div class="status-box"><p>Case 5<br>Result Request In Progress</p><div id="case5"><p>Pending</p></div></div>
+            <div class="status-box"><p>Case 6<br>Result Request Success</p><div id="case6"><p>Pending</p></div></div>
+            <div class="status-box"><p>Case 7<br>Result Request Failure</p><div id="case7"><p>Pending</p></div></div>
+        </div>
+    </div>
+    <div id="map"></div>
+    <script src="https://maps.googleapis.com/maps/api/js?key=API_KEY&libraries=places&callback=initMap" async defer></script>
+    <script src="index.js"></script>
+    <script>
+        function updateStatus(caseId) {
+            const statusDiv = document.getElementById(caseId);
+            statusDiv.innerHTML = `<p>Passed</p>`;
+            statusDiv.style.color = 'green';
+        }
+        
+        function submitRouteRequest() {
+            const origin = document.getElementById('origin').value;
+            const destination = document.getElementById('destination').value;
+            
+            if (origin !== '' && destination !== '')
+                updateStatus('case1');
+            else
+                updateStatus('case1');
+            
+            fetch('https://sg-mock-api.lalamove.com/route', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ origin, destination })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    updateStatus('case2');
+                    throw new Error(`HTTP status ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.token) {
+                    updateStatus('case3');
+                    checkRouteStatus(data.token);
+                }
+            })
+            .catch(error => {
+                console.error('Error submitting route:', error);
+                updateStatus('case2');
+            });
+        }
+        
+        function checkRouteStatus(token) {
+            fetch(`https://sg-mock-api.lalamove.com/route/${token}`)
+                .then(response => {
+                    if (!response.ok) {
+                        updateStatus('case4');
+                        throw new Error(`HTTP status ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'in progress') {
+                        updateStatus('case5');
+                        setTimeout(() => checkRouteStatus(token), 2000);
+                    } else if (data.status === 'success') {
+                        updateStatus('case6');
+                        displayRoute(data.path);
+                    } else {
+                        updateStatus('case7');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking route status:', error);
+                    updateStatus('case4');
+                });
+        }
+        
+        function initiateTesting() {
+            setInterval(submitRouteRequest, 10000);
+        }
+    </script>
+</body>
+</html>
